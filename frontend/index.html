@@ -446,9 +446,34 @@
     var _token = localStorage.getItem('sb-access-token');
     if (!_token) { window.location.href = '/login'; }
 
+    (async function() {
+        if (!_token) return;
+        try {
+            var r = await fetch('/api/leads/stats/summary', { headers: { 'Authorization': 'Bearer ' + _token } });
+            if (r.status === 401) {
+                localStorage.removeItem('sb-access-token');
+                localStorage.removeItem('sb-refresh-token');
+                window.location.href = '/login';
+            }
+        } catch (e) { /* offline, keep going */ }
+    })();
+
     window.authHeaders = function() {
         var t = localStorage.getItem('sb-access-token');
         return t ? { 'Authorization': 'Bearer ' + t } : {};
+    };
+
+    window._authFetch = async function(url, opts) {
+        opts = opts || {};
+        opts.headers = Object.assign({}, opts.headers || {}, authHeaders());
+        var res = await fetch(url, opts);
+        if (res.status === 401) {
+            localStorage.removeItem('sb-access-token');
+            localStorage.removeItem('sb-refresh-token');
+            window.location.href = '/login';
+            return res;
+        }
+        return res;
     };
 
     window.logout = function() {
@@ -522,7 +547,7 @@ document.addEventListener('alpine:init', function() {
 
             async loadStats() {
                 try {
-                    const res = await fetch(`${API}/api/leads/stats/summary`, { headers: authHeaders() });
+                    const res = await _authFetch(`${API}/api/leads/stats/summary`);
                     this.stats = await res.json();
                 } catch (e) { console.error(e); }
             },
@@ -532,7 +557,7 @@ document.addEventListener('alpine:init', function() {
                     let url = `${API}/api/leads?`;
                     if (this.leadFilter) url += `status=${this.leadFilter}&`;
                     if (this.leadSearch) url += `search=${encodeURIComponent(this.leadSearch)}&`;
-                    const res = await fetch(url, { headers: authHeaders() });
+                    const res = await _authFetch(url);
                     this.leads = await res.json();
                 } catch (e) { console.error(e); }
             },
@@ -541,9 +566,9 @@ document.addEventListener('alpine:init', function() {
                 this.scraperLoading = true;
                 this.scraperResult = null;
                 try {
-                    const res = await fetch(`${API}/api/scraper/search`, {
+                    const res = await _authFetch(`${API}/api/scraper/search`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.scraperForm),
                     });
                     const data = await res.json();
@@ -564,9 +589,9 @@ document.addEventListener('alpine:init', function() {
 
             async updateLeadStatus(id, status) {
                 try {
-                    await fetch(`${API}/api/leads/${id}`, {
+                    await _authFetch(`${API}/api/leads/${id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ status }),
                     });
                     await this.loadStats();
@@ -591,9 +616,9 @@ document.addEventListener('alpine:init', function() {
 
             async saveLeadDetail() {
                 try {
-                    await fetch(`${API}/api/leads/${this.selectedLead.id}`, {
+                    await _authFetch(`${API}/api/leads/${this.selectedLead.id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.detailForm),
                     });
                     this.showDetail = false;
@@ -605,7 +630,7 @@ document.addEventListener('alpine:init', function() {
             async deleteLead(id) {
                 if (!confirm('¿Eliminar este lead?')) return;
                 try {
-                    await fetch(`${API}/api/leads/${id}`, { method: 'DELETE', headers: authHeaders() });
+                    await _authFetch(`${API}/api/leads/${id}`, { method: 'DELETE' });
                     await this.loadLeads();
                     await this.loadStats();
                 } catch (e) { console.error(e); }
@@ -613,7 +638,7 @@ document.addEventListener('alpine:init', function() {
 
             async generateBrief(id) {
                 try {
-                    const res = await fetch(`${API}/api/briefs/${id}/generate`, { method: 'POST', headers: authHeaders() });
+                    const res = await _authFetch(`${API}/api/briefs/${id}/generate`, { method: 'POST' });
                     const data = await res.json();
                     if (data.status === 'ok') {
                         this.copiedSlug = data.slug;
@@ -666,7 +691,7 @@ document.addEventListener('alpine:init', function() {
                     return;
                 }
                 try {
-                    const res = await fetch(`${API}/api/briefs/${id}/raw`, { headers: authHeaders() });
+                    const res = await _authFetch(`${API}/api/briefs/${id}/raw`);
                     if (res.ok) {
                         this.briefContent = await res.text();
                     } else {
@@ -679,7 +704,7 @@ document.addEventListener('alpine:init', function() {
 
             async downloadBrief(id, slug) {
                 try {
-                    const res = await fetch(`${API}/api/briefs/${id}/download`, { headers: authHeaders() });
+                    const res = await _authFetch(`${API}/api/briefs/${id}/download`);
                     if (!res.ok) {
                         alert('Brief no generado aún');
                         return;
@@ -757,9 +782,9 @@ document.addEventListener('alpine:init', function() {
 
                 this.coldMessage = `Hola ${name}, soy Adrian, diseño y actualizo páginas web aquí en Manta. Estuve buscando la web de ${name} y ${problemText}. Puedo presentarles una propuesta en 24-48h incorporando su contenido. Tengo cupo esta semana con precio de lanzamiento — ¿te mando antes/después de otros proyectos para que veas el estilo?`;
 
-                fetch(`${API}/api/leads/${this.selectedLead.id}`, {
+                _authFetch(`${API}/api/leads/${this.selectedLead.id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ problem: problemText, problem_key: this.selectedProblem || 'custom' }),
                 }).then(() => {
                     this.selectedLead.problem = problemText;
