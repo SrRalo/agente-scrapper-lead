@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Pipeline - Scraper de Negocios</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+<div x-data="app()" x-init="init()" x-cloak class="flex h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+        <div class="p-4 border-b border-gray-800">
+            <h1 class="text-xl font-bold text-white">Lead Pipeline</h1>
+            <p class="text-xs text-gray-500 mt-1">Scraper + Brief Generator</p>
+        </div>
+
+        <nav class="flex-1 p-3 space-y-1">
+            <button @click="currentView = 'dashboard'" :class="currentView === 'dashboard' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'" class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                Dashboard
+            </button>
+            <button @click="currentView = 'scraper'" :class="currentView === 'scraper' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'" class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                Scraper
+            </button>
+            <button @click="currentView = 'leads'" :class="currentView === 'leads' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'" class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Leads
+                <span x-show="stats.total > 0" class="ml-auto bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full" x-text="stats.total"></span>
+            </button>
+        </nav>
+
+        <!-- Stats -->
+        <div class="p-4 border-t border-gray-800 space-y-2">
+            <template x-for="(count, status) in stats.by_status" :key="status">
+                <div class="flex justify-between text-xs">
+                    <span class="text-gray-500" x-text="statusLabels[status] || status"></span>
+                    <span class="text-gray-300 font-medium" x-text="count"></span>
+                </div>
+            </template>
+        </div>
+
+        <!-- Logout -->
+        <div class="p-3 border-t border-gray-800">
+            <button @click="logout()" class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 text-gray-400 hover:bg-gray-800/50 hover:text-red-400 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                Cerrar Sesión
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto">
+
+        <!-- Dashboard View -->
+        <div x-show="currentView === 'dashboard'" class="p-6">
+            <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold text-white" x-text="stats.total || 0"></div>
+                    <div class="text-sm text-gray-500">Total Leads</div>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold text-yellow-400" x-text="stats.by_status?.contacted || 0"></div>
+                    <div class="text-sm text-gray-500">Contactados</div>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold text-green-400" x-text="stats.by_status?.confirmed || 0"></div>
+                    <div class="text-sm text-gray-500">Confirmados</div>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <div class="text-3xl font-bold text-blue-400" x-text="stats.by_status?.brief_generated || 0"></div>
+                    <div class="text-sm text-gray-500">Briefs Generados</div>
+                </div>
+            </div>
+
+            <!-- Pipeline Flow -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Pipeline de Estados</h3>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <template x-for="(label, key) in statusLabels" :key="key">
+                        <div class="flex items-center gap-2">
+                            <div class="px-3 py-1.5 rounded-full text-xs font-medium"
+                                 :class="{
+                                    'bg-gray-700 text-gray-300': key === 'scraped',
+                                    'bg-yellow-900/50 text-yellow-300 border border-yellow-700': key === 'contacted',
+                                    'bg-orange-900/50 text-orange-300 border border-orange-700': key === 'responded',
+                                    'bg-green-900/50 text-green-300 border border-green-700': key === 'confirmed',
+                                    'bg-blue-900/50 text-blue-300 border border-blue-700': key === 'brief_generated',
+                                    'bg-purple-900/50 text-purple-300 border border-purple-700': key === 'building',
+                                    'bg-emerald-900/50 text-emerald-300 border border-emerald-700': key === 'done',
+                                    'bg-red-900/50 text-red-300 border border-red-700': key === 'rejected',
+                                 }"
+                                 x-text="label"></div>
+                            <span x-show="Object.keys(statusLabels).indexOf(key) < Object.keys(statusLabels).length - 1" class="text-gray-600">→</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scraper View -->
+        <div x-show="currentView === 'scraper'" class="p-6">
+            <h2 class="text-2xl font-bold mb-6">Scraper de Google Maps</h2>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-2xl">
+                <form @submit.prevent="runScraper()" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Búsqueda</label>
+                        <input x-model="scraperForm.query" type="text" required
+                               placeholder="ej: restaurantes, dentistas, gym, abogados..."
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Ubicación (opcional)</label>
+                        <input x-model="scraperForm.location" type="text"
+                               placeholder="ej: Buenos Aires, Madrid, Ciudad de México..."
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Máx. resultados</label>
+                        <input x-model.number="scraperForm.max_results" type="number" min="1" max="100"
+                               class="w-32 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" :disabled="scraperLoading"
+                            class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-wait text-white font-medium px-6 py-2.5 rounded-lg transition flex items-center gap-2">
+                        <svg x-show="scraperLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="scraperLoading ? 'Buscando...' : 'Buscar Negocios'"></span>
+                    </button>
+                </form>
+
+                <!-- Results -->
+                <div x-show="scraperResult" class="mt-6 border-t border-gray-700 pt-6">
+                    <div x-show="scraperResult?.error" class="text-red-400 text-sm" x-text="scraperResult?.error"></div>
+                    <div x-show="scraperResult?.status === 'ok'" class="space-y-2">
+                        <div class="text-sm text-gray-400">
+                            Encontrados: <span class="text-white font-medium" x-text="scraperResult?.total_found"></span> |
+                            Insertados: <span class="text-green-400 font-medium" x-text="scraperResult?.inserted"></span> |
+                            Duplicados: <span class="text-yellow-400 font-medium" x-text="scraperResult?.skipped"></span>
+                        </div>
+                        <button @click="loadLeads(); currentView = 'leads'" class="text-blue-400 hover:text-blue-300 text-sm">
+                            Ver leads →
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leads View -->
+        <div x-show="currentView === 'leads'" class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">Leads</h2>
+                <div class="flex gap-2">
+                    <input x-model="leadSearch" @input.debounce.300ms="loadLeads()" type="text" placeholder="Buscar..."
+                           class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    <select x-model="leadFilter" @change="loadLeads()"
+                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                        <option value="">Todos</option>
+                        <template x-for="(label, key) in statusLabels" :key="key">
+                            <option :value="key" x-text="label"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-800/50">
+                        <tr>
+                            <th class="text-left px-4 py-3 text-gray-400 font-medium">Negocio</th>
+                            <th class="text-left px-4 py-3 text-gray-400 font-medium">WhatsApp</th>
+                            <th class="text-left px-4 py-3 text-gray-400 font-medium">Ciudad</th>
+                            <th class="text-left px-4 py-3 text-gray-400 font-medium">Estado</th>
+                            <th class="text-left px-4 py-3 text-gray-400 font-medium">Brief</th>
+                            <th class="text-center px-3 py-3 text-gray-400 font-medium w-10">Maps</th>
+                            <th class="text-left px-4 py-3 text-gray-400 font-medium">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <template x-for="lead in leads" :key="lead.id">
+                            <tr class="hover:bg-gray-800/30 transition">
+                                <td class="px-4 py-3">
+                                    <div class="font-medium text-white" x-text="lead.business_name"></div>
+                                    <div class="text-xs text-gray-500" x-text="(lead.category || lead.business_type || '') + (lead.rating ? ' ★' + lead.rating : '')"></div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <template x-if="lead.phone">
+                                        <button @click="copyPhone(lead.phone, $event)" 
+                                                class="inline-flex items-center gap-1.5 bg-green-900/40 hover:bg-green-800/60 border border-green-700/50 text-green-300 text-xs font-medium px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                                                :class="copiedId === lead.id ? 'bg-green-700/40 border-green-500' : ''">
+                                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                            <span x-text="lead.phone"></span>
+                                            <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                        </button>
+                                    </template>
+                                    <template x-if="!lead.phone">
+                                        <span class="text-gray-600 text-xs">-</span>
+                                    </template>
+                                </td>
+                                <td class="px-4 py-3 text-gray-400" x-text="lead.city || '-'"></td>
+                                <td class="px-4 py-3">
+                                    <select :value="lead.status" @change="updateLeadStatus(lead.id, $event.target.value)"
+                                            class="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                                            :class="{
+                                                'text-gray-400': lead.status === 'scraped',
+                                                'text-yellow-400 border-yellow-700': lead.status === 'contacted',
+                                                'text-orange-400 border-orange-700': lead.status === 'responded',
+                                                'text-green-400 border-green-700': lead.status === 'confirmed',
+                                                'text-blue-400 border-blue-700': lead.status === 'brief_generated',
+                                                'text-purple-400 border-purple-700': lead.status === 'building',
+                                                'text-emerald-400 border-emerald-700': lead.status === 'done',
+                                                'text-red-400 border-red-700': lead.status === 'rejected',
+                                            }">
+                                        <template x-for="(label, key) in statusLabels" :key="key">
+                                            <option :value="key" x-text="label"></option>
+                                        </template>
+                                    </select>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <template x-if="lead.status === 'brief_generated'">
+                                        <button @click="copyBriefPath(lead.slug, $event)"
+                                                class="inline-flex items-center gap-1 bg-blue-900/40 hover:bg-blue-800/60 border border-blue-700/50 text-blue-300 text-xs px-2 py-1 rounded-lg transition cursor-pointer"
+                                                :class="copiedSlug === lead.slug ? 'bg-blue-700/40 border-blue-500' : ''">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                            brief/<span x-text="lead.slug"></span>.md
+                                        </button>
+                                    </template>
+                                    <template x-if="lead.status !== 'brief_generated'">
+                                        <span class="text-gray-600 text-xs">-</span>
+                                    </template>
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <div class="flex gap-1 justify-center">
+                                        <a :href="lead.google_url" target="_blank" rel="noopener"
+                                           class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition"
+                                           title="Ver en Google Maps">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                        </a>
+                                        <template x-if="lead.phone">
+                                            <a :href="getWhatsAppUrl(lead)" target="_blank" rel="noopener"
+                                               class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-green-900/50 hover:bg-green-800 text-green-400 hover:text-green-300 transition"
+                                               title="Enviar WhatsApp">
+                                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                            </a>
+                                        </template>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex gap-1">
+                                        <button @click="openLeadDetail(lead)" class="p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition" title="Ver detalle">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                        </button>
+                                        <button @click="generateBrief(lead.id)" class="p-1.5 text-blue-400 hover:text-blue-300 rounded hover:bg-gray-700 transition" title="Generar Brief">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        </button>
+                                        <button @click="deleteLead(lead.id)" class="p-1.5 text-gray-400 hover:text-red-400 rounded hover:bg-gray-700 transition" title="Eliminar">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <div x-show="leads.length === 0" class="p-12 text-center text-gray-500">
+                    No hay leads. Usa el scraper para agregar negocios.
+                </div>
+            </div>
+        </div>
+
+        <!-- Lead Detail Modal -->
+        <div x-show="showDetail" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" @click.self="showDetail = false; briefContent = null" x-cloak>
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-white" x-text="selectedLead?.business_name"></h3>
+                            <p class="text-sm text-gray-400" x-text="(selectedLead?.category || '') + (selectedLead?.city ? ' · ' + selectedLead?.city : '')"></p>
+                        </div>
+                        <button @click="showDetail = false; briefContent = null" class="text-gray-400 hover:text-white p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Contact Info -->
+                        <div class="bg-gray-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-400 mb-2">Contacto</h4>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div><span class="text-gray-500">Teléfono:</span> <span class="text-white" x-text="selectedLead?.phone || '-'"></span></div>
+                                <div><span class="text-gray-500">Email:</span> <span class="text-white" x-text="selectedLead?.email || '-'"></span></div>
+                                <div><span class="text-gray-500">Web:</span> <a :href="selectedLead?.website" target="_blank" class="text-blue-400 hover:underline" x-text="selectedLead?.website || '-'"></a></div>
+                                <div><span class="text-gray-500">Rating:</span> <span class="text-yellow-400" x-text="selectedLead?.rating + ' (' + selectedLead?.reviews_count + ')'"></span></div>
+                            </div>
+                        </div>
+
+                        <!-- Editable Fields -->
+                        <div class="bg-gray-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-400 mb-2">Editar</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs text-gray-500">Descripción</label>
+                                    <textarea x-model="detailForm.description_short" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"></textarea>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-xs text-gray-500">Email</label>
+                                        <input x-model="detailForm.email" type="email" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-500">Teléfono</label>
+                                        <input x-model="detailForm.phone" type="text" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-xs text-gray-500">Método de contacto</label>
+                                        <select x-model="detailForm.contact_method" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                            <option value="">Seleccionar...</option>
+                                            <option value="whatsapp">WhatsApp</option>
+                                            <option value="email">Email</option>
+                                            <option value="phone">Llamada</option>
+                                            <option value="instagram">Instagram DM</option>
+                                            <option value="linkedin">LinkedIn</option>
+                                            <option value="otro">Otro</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-500">Fecha de contacto</label>
+                                        <input x-model="detailForm.contact_date" type="date" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-500">Notas</label>
+                                    <textarea x-model="detailForm.notes" rows="3" placeholder="Notas sobre la conversación, respuestas, etc." class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex gap-3">
+                            <button @click="saveLeadDetail()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">
+                                Guardar Cambios
+                            </button>
+                            <button @click="generateBrief(selectedLead?.id)" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition">
+                                Generar Brief
+                            </button>
+                        </div>
+
+                        <!-- Brief Section -->
+                        <div x-show="selectedLead?.status === 'brief_generated'" class="bg-gray-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-400 mb-3">Brief Generado</h4>
+                            
+                            <div class="bg-gray-950 rounded-lg p-3 mb-3 font-mono text-xs">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-gray-500">Ruta del brief:</span>
+                                    <button @click="copyBriefPath(selectedLead?.slug, $event)" 
+                                            class="text-blue-400 hover:text-blue-300 text-xs"
+                                            x-text="copiedSlug === selectedLead?.slug ? 'Copiado!' : 'Copiar'"></button>
+                                </div>
+                                <code class="text-green-400" x-text="'briefs/' + selectedLead?.slug + '.md'"></code>
+                            </div>
+
+                            <div class="bg-gray-950 rounded-lg p-3 font-mono text-xs">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-gray-500">Comando para tu agente:</span>
+                                    <button @click="copyCliCommand(selectedLead?.slug)" 
+                                            class="text-blue-400 hover:text-blue-300 text-xs">Copiar</button>
+                                </div>
+                                <code class="text-yellow-300 break-all" x-text="get_cli_command(selectedLead?.slug)"></code>
+                            </div>
+
+                            <div class="mt-3">
+                                <button @click="viewBrief(selectedLead?.id)" class="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    Ver contenido del brief
+                                </button>
+                                <div x-show="briefContent" class="mt-2 bg-gray-950 rounded-lg p-3 max-h-64 overflow-y-auto">
+                                    <pre class="text-xs text-gray-300 whitespace-pre-wrap" x-text="briefContent"></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cold Message Template -->
+                        <div class="bg-gray-800/50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-400 mb-3">Mensaje Frío Personalizado</h4>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-xs text-gray-500 block mb-1">Problema detectado</label>
+                                    <select x-model="selectedProblem" @change="buildMessage()"
+                                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                        <option value="">Seleccionar problema...</option>
+                                        <option value="no_web">No tiene página web</option>
+                                        <option value="no_whatsapp">No tiene botón de WhatsApp</option>
+                                        <option value="mobile">No se ve bien desde el celular</option>
+                                        <option value="outdated">El diseño se ve desactualizado</option>
+                                        <option value="slow">La web carga lento</option>
+                                        <option value="no_form">No tiene formulario de contacto</option>
+                                        <option value="custom">Otro (personalizar abajo)</option>
+                                    </select>
+                                </div>
+
+                                <div x-show="selectedProblem === 'custom'">
+                                    <label class="text-xs text-gray-500 block mb-1">Problema personalizado</label>
+                                    <input x-model="customProblem" @input="buildMessage()" type="text"
+                                           placeholder="Ej: no tiene redes sociales vinculadas..."
+                                           class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                </div>
+
+                                <div>
+                                    <label class="text-xs text-gray-500 block mb-1">Mensaje generado</label>
+                                    <div class="relative">
+                                        <textarea x-ref="messageBox" readonly rows="8"
+                                                  class="w-full bg-gray-950 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 font-mono leading-relaxed focus:outline-none focus:border-blue-500 resize-none"
+                                                  x-text="coldMessage"></textarea>
+                                        <button @click="copyMessage()" 
+                                                class="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition"
+                                                x-text="messageCopied ? 'Copiado!' : 'Copiar'"></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    var SB_URL = 'https://ctwxoqsamykfmmbfrlgb.supabase.co';
+    var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3hvcXNhbXlrZm1tYmZybGdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODk2MDcsImV4cCI6MjEwMjU2NTYwN30.WvjKlG7y1T69f7TdRXFTSbzajrjzw2wF3BHjHwNNM20';
+
+    var _token = localStorage.getItem('sb-access-token');
+    if (!_token) { window.location.href = '/login'; }
+
+    window.authHeaders = function() {
+        var t = localStorage.getItem('sb-access-token');
+        return t ? { 'Authorization': 'Bearer ' + t } : {};
+    };
+
+    window.logout = function() {
+        localStorage.removeItem('sb-access-token');
+        localStorage.removeItem('sb-refresh-token');
+        window.location.href = '/login';
+    };
+
+    setInterval(async function() {
+        var rt = localStorage.getItem('sb-refresh-token');
+        if (!rt) { window.location.href = '/login'; return; }
+        try {
+            var res = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY },
+                body: JSON.stringify({ refresh_token: rt })
+            });
+            var data = await res.json();
+            if (data.access_token) {
+                localStorage.setItem('sb-access-token', data.access_token);
+                localStorage.setItem('sb-refresh-token', data.refresh_token);
+            } else {
+                window.location.href = '/login';
+            }
+        } catch (e) { /* keep existing token */ }
+    }, 60000);
+</script>
+<script>
+const API = '';
+
+function app() {
+    return {
+        currentView: 'dashboard',
+        stats: {},
+        leads: [],
+        leadFilter: '',
+        leadSearch: '',
+        showDetail: false,
+        selectedLead: null,
+        detailForm: {},
+
+        scraperForm: { query: '', location: '', max_results: 20 },
+        scraperLoading: false,
+        scraperResult: null,
+        copiedId: null,
+        copiedSlug: null,
+        briefContent: null,
+
+        selectedProblem: '',
+        customProblem: '',
+        coldMessage: '',
+        messageCopied: false,
+
+        statusLabels: {
+            scraped: 'Scrapeado',
+            contacted: 'Contactado',
+            responded: 'Respondido',
+            confirmed: 'Confirmado',
+            brief_generated: 'Brief Listo',
+            building: 'Construyendo',
+            done: 'Completado',
+            rejected: 'Rechazado',
+        },
+
+        async init() {
+            await this.loadStats();
+            await this.loadLeads();
+        },
+
+        async loadStats() {
+            try {
+                const res = await fetch(`${API}/api/leads/stats/summary`, { headers: authHeaders() });
+                this.stats = await res.json();
+            } catch (e) { console.error(e); }
+        },
+
+        async loadLeads() {
+            try {
+                let url = `${API}/api/leads?`;
+                if (this.leadFilter) url += `status=${this.leadFilter}&`;
+                if (this.leadSearch) url += `search=${encodeURIComponent(this.leadSearch)}&`;
+                const res = await fetch(url, { headers: authHeaders() });
+                this.leads = await res.json();
+            } catch (e) { console.error(e); }
+        },
+
+        async runScraper() {
+            this.scraperLoading = true;
+            this.scraperResult = null;
+            try {
+                const res = await fetch(`${API}/api/scraper/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify(this.scraperForm),
+                });
+                const data = await res.json();
+                if (data.status === 'error') {
+                    this.scraperResult = { error: data.error };
+                } else if (data.status === 'ok') {
+                    this.scraperResult = data;
+                    await this.loadStats();
+                    await this.loadLeads();
+                } else {
+                    this.scraperResult = { error: data.detail || 'Error desconocido' };
+                }
+            } catch (e) {
+                this.scraperResult = { error: 'Error de conexión: ' + e.message };
+            }
+            this.scraperLoading = false;
+        },
+
+        async updateLeadStatus(id, status) {
+            try {
+                await fetch(`${API}/api/leads/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ status }),
+                });
+                await this.loadStats();
+            } catch (e) { console.error(e); }
+        },
+
+        openLeadDetail(lead) {
+            this.selectedLead = lead;
+            this.detailForm = {
+                description_short: lead.description_short || '',
+                email: lead.email || '',
+                phone: lead.phone || '',
+                contact_method: lead.contact_method || '',
+                contact_date: lead.contact_date || '',
+                notes: lead.notes || '',
+            };
+            this.selectedProblem = lead.problem_key || '';
+            this.customProblem = lead.problem_key === 'custom' ? (lead.problem || '') : '';
+            this.coldMessage = '';
+            this.showDetail = true;
+        },
+
+        async saveLeadDetail() {
+            try {
+                await fetch(`${API}/api/leads/${this.selectedLead.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify(this.detailForm),
+                });
+                this.showDetail = false;
+                await this.loadLeads();
+                await this.loadStats();
+            } catch (e) { console.error(e); }
+        },
+
+        async deleteLead(id) {
+            if (!confirm('¿Eliminar este lead?')) return;
+            try {
+                await fetch(`${API}/api/leads/${id}`, { method: 'DELETE', headers: authHeaders() });
+                await this.loadLeads();
+                await this.loadStats();
+            } catch (e) { console.error(e); }
+        },
+
+        async generateBrief(id) {
+            try {
+                const res = await fetch(`${API}/api/briefs/${id}/generate`, { method: 'POST', headers: authHeaders() });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.copiedSlug = data.slug;
+                    setTimeout(() => { this.copiedSlug = null; }, 3000);
+                    await this.loadLeads();
+                    await this.loadStats();
+                } else {
+                    alert(`Error: ${data.detail || 'Error desconocido'}`);
+                }
+            } catch (e) { alert(`Error: ${e.message}`); }
+        },
+
+        async copyBriefPath(slug, event) {
+            const path = `briefs/${slug}.md`;
+            try {
+                await navigator.clipboard.writeText(path);
+            } catch (e) {
+                const ta = document.createElement('textarea');
+                ta.value = path;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            this.copiedSlug = slug;
+            setTimeout(() => { this.copiedSlug = null; }, 1500);
+        },
+
+        get_cli_command(slug) {
+            return `opencode "Genera una landing page con panel de admin usando el brief: briefs/${slug}.md"`;
+        },
+
+        async copyCliCommand(slug) {
+            const cmd = this.get_cli_command(slug);
+            try {
+                await navigator.clipboard.writeText(cmd);
+            } catch (e) {
+                const ta = document.createElement('textarea');
+                ta.value = cmd;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        },
+
+        async viewBrief(id) {
+            if (this.briefContent) {
+                this.briefContent = null;
+                return;
+            }
+            try {
+                const res = await fetch(`${API}/api/briefs/${id}/raw`, { headers: authHeaders() });
+                if (res.ok) {
+                    this.briefContent = await res.text();
+                } else {
+                    this.briefContent = 'Error al cargar el brief';
+                }
+            } catch (e) {
+                this.briefContent = 'Error: ' + e.message;
+            }
+        },
+
+        async copyPhone(phone, event) {
+            const clean = phone.replace(/[^\d+]/g, '');
+            try {
+                await navigator.clipboard.writeText(clean);
+                this.copiedId = event.target.closest('button')._leadId || null;
+                const btn = event.target.closest('button');
+                const lead = this.leads.find(l => l.phone === phone);
+                if (lead) this.copiedId = lead.id;
+                setTimeout(() => { this.copiedId = null; }, 1500);
+            } catch (e) {
+                const ta = document.createElement('textarea');
+                ta.value = clean;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                const lead = this.leads.find(l => l.phone === phone);
+                if (lead) this.copiedId = lead.id;
+                setTimeout(() => { this.copiedId = null; }, 1500);
+            }
+        },
+
+        getWhatsAppUrl(lead) {
+            let phone = (lead.phone || '').replace(/[^\d]/g, '');
+            if (phone.startsWith('593')) {
+                // Already has country code
+            } else if (phone.startsWith('0')) {
+                phone = '593' + phone.slice(1);
+            } else if (phone.length >= 9) {
+                phone = '593' + phone;
+            }
+
+            const name = lead.business_name || 'Negocio';
+            const problem = lead.problem || 'Requiero más información sobre sus servicios.';
+            const text = `Saludos ${name}. ${problem}`;
+            const encoded = encodeURIComponent(text);
+            return `https://api.whatsapp.com/send/?phone=${phone}&text=${encoded}&type=phone_number&app_absent=0`;
+        },
+
+        buildMessage() {
+            if (!this.selectedLead) {
+                this.coldMessage = '';
+                return;
+            }
+
+            const name = this.selectedLead.business_name || 'Negocio';
+            const problems = {
+                no_web: 'no tiene página web',
+                no_whatsapp: 'no tiene el botón de WhatsApp para contactarte directo',
+                mobile: 'no se ve muy bien desde el celular',
+                outdated: 'el diseño se ve un poco desactualizado frente a la competencia',
+                slow: 'la web carga lento',
+                no_form: 'no tiene formulario de contacto',
+            };
+
+            let problemText = problems[this.selectedProblem] || this.customProblem || 'Requiero más información sobre sus servicios.';
+            if (this.selectedProblem === 'custom') problemText = this.customProblem || 'Requiero más información sobre sus servicios.';
+
+            this.coldMessage = `Hola ${name}, soy Adrian, diseño y actualizo páginas web aquí en Manta. Estuve buscando la web de ${name} y ${problemText}. Puedo presentarles una propuesta en 24-48h incorporando su contenido. Tengo cupo esta semana con precio de lanzamiento — ¿te mando antes/después de otros proyectos para que veas el estilo?`;
+
+            // Save problem to lead
+            fetch(`${API}/api/leads/${this.selectedLead.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify({ problem: problemText, problem_key: this.selectedProblem || 'custom' }),
+            }).then(() => {
+                this.selectedLead.problem = problemText;
+                this.selectedLead.problem_key = this.selectedProblem || 'custom';
+            });
+        },
+
+        async copyMessage() {
+            try {
+                await navigator.clipboard.writeText(this.coldMessage);
+            } catch (e) {
+                const ta = document.createElement('textarea');
+                ta.value = this.coldMessage;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            this.messageCopied = true;
+            setTimeout(() => { this.messageCopied = false; }, 1500);
+        },
+    };
+}
+</script>
+<script src="/js/alpine.min.js"></script>
+
+</body>
+</html>
