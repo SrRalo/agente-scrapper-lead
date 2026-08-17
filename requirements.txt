@@ -5,3 +5,4 @@ serpapi
 python-dotenv
 asyncpg
 python-jose[cryptography]
+httpx

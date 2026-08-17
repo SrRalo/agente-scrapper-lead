@@ -59,8 +59,8 @@ document.addEventListener('alpine:init', function() {
             loading: false,
             error: '',
             init: function() {
-                var t = localStorage.getItem('sb-access-token');
-                if (t) window.location.href = '/';
+                localStorage.removeItem('sb-access-token');
+                localStorage.removeItem('sb-refresh-token');
             },
             login: async function() {
                 this.loading = true;
