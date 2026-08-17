@@ -206,6 +206,10 @@ status: brief_generated
 """
 
     filepath = BRIEFS_DIR / f"{slug}.md"
-    filepath.write_text(md, encoding="utf-8")
+    try:
+        BRIEFS_DIR.mkdir(parents=True, exist_ok=True)
+        filepath.write_text(md, encoding="utf-8")
+    except (OSError, PermissionError):
+        pass
 
-    return str(filepath)
+    return md

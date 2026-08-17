@@ -360,14 +360,15 @@
                         <div x-show="selectedLead?.status === 'brief_generated'" class="bg-gray-800/50 rounded-lg p-4">
                             <h4 class="text-sm font-medium text-gray-400 mb-3">Brief Generado</h4>
                             
-                            <div class="bg-gray-950 rounded-lg p-3 mb-3 font-mono text-xs">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-gray-500">Ruta del brief:</span>
-                                    <button @click="copyBriefPath(selectedLead?.slug, $event)" 
-                                            class="text-blue-400 hover:text-blue-300 text-xs"
-                                            x-text="copiedSlug === selectedLead?.slug ? 'Copiado!' : 'Copiar'"></button>
-                                </div>
-                                <code class="text-green-400" x-text="'briefs/' + selectedLead?.slug + '.md'"></code>
+                            <div class="flex gap-2 mb-3">
+                                <button @click="downloadBrief(selectedLead?.id, selectedLead?.slug)" 
+                                        class="inline-flex items-center gap-1.5 bg-green-900/40 hover:bg-green-800/60 border border-green-700/50 text-green-300 text-xs font-medium px-3 py-1.5 rounded-lg transition">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    Descargar .md
+                                </button>
+                                <button @click="copyBriefPath(selectedLead?.slug, $event)" 
+                                        class="inline-flex items-center gap-1.5 bg-blue-900/40 hover:bg-blue-800/60 border border-blue-700/50 text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg transition"
+                                        x-text="copiedSlug === selectedLead?.slug ? 'Copiado!' : 'Copiar ruta'"></button>
                             </div>
 
                             <div class="bg-gray-950 rounded-lg p-3 font-mono text-xs">
@@ -673,6 +674,27 @@ document.addEventListener('alpine:init', function() {
                     }
                 } catch (e) {
                     this.briefContent = 'Error: ' + e.message;
+                }
+            },
+
+            async downloadBrief(id, slug) {
+                try {
+                    const res = await fetch(`${API}/api/briefs/${id}/download`, { headers: authHeaders() });
+                    if (!res.ok) {
+                        alert('Brief no generado aún');
+                        return;
+                    }
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `brief-${slug}.md`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert('Error: ' + e.message);
                 }
             },
 

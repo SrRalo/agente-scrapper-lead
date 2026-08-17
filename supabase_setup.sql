@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS leads (
   brief_data TEXT DEFAULT '{}',
   problem TEXT DEFAULT '',
   problem_key TEXT DEFAULT '',
+  brief_content TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
