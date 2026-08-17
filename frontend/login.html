@@ -49,46 +49,49 @@
 <script>
 var SB_URL = 'https://ctwxoqsamykfmmbfrlgb.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3hvcXNhbXlrZm1tYmZybGdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5ODk2MDcsImV4cCI6MjEwMjU2NTYwN30.WvjKlG7y1T69f7TdRXFTSbzajrjzw2wF3BHjHwNNM20';
-
-function loginApp() {
-    return {
-        email: '',
-        password: '',
-        loading: false,
-        error: '',
-        init: function() {
-            var t = localStorage.getItem('sb-access-token');
-            if (t) window.location.href = '/';
-        },
-        login: async function() {
-            this.loading = true;
-            this.error = '';
-            try {
-                var res = await fetch(SB_URL + '/auth/v1/token?grant_type=password', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': SB_KEY
-                    },
-                    body: JSON.stringify({ email: this.email, password: this.password })
-                });
-                var data = await res.json();
-                if (data.error) {
-                    this.error = data.error_description || 'Email o contraseña incorrectos';
+</script>
+<script>
+document.addEventListener('alpine:init', function() {
+    Alpine.data('loginApp', function() {
+        return {
+            email: '',
+            password: '',
+            loading: false,
+            error: '',
+            init: function() {
+                var t = localStorage.getItem('sb-access-token');
+                if (t) window.location.href = '/';
+            },
+            login: async function() {
+                this.loading = true;
+                this.error = '';
+                try {
+                    var res = await fetch(SB_URL + '/auth/v1/token?grant_type=password', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SB_KEY
+                        },
+                        body: JSON.stringify({ email: this.email, password: this.password })
+                    });
+                    var data = await res.json();
+                    if (data.error) {
+                        this.error = data.error_description || 'Email o contraseña incorrectos';
+                        this.loading = false;
+                        return;
+                    }
+                    localStorage.setItem('sb-access-token', data.access_token);
+                    localStorage.setItem('sb-refresh-token', data.refresh_token);
+                    window.location.href = '/';
+                } catch (e) {
+                    this.error = 'Error de conexión';
                     this.loading = false;
-                    return;
                 }
-                localStorage.setItem('sb-access-token', data.access_token);
-                localStorage.setItem('sb-refresh-token', data.refresh_token);
-                window.location.href = '/';
-            } catch (e) {
-                this.error = 'Error de conexión';
-                this.loading = false;
             }
         }
-    }
-}
+    });
+});
 </script>
-<script src="/js/alpine.min.js"></script>
+<script src="/js/alpine.min.js" defer></script>
 </body>
 </html>
