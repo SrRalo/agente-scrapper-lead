@@ -158,16 +158,20 @@
         <div x-show="currentView === 'leads'" class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold">Leads</h2>
-                <div class="flex gap-2">
-                    <input x-model="leadSearch" @input.debounce.300ms="loadLeads()" type="text" placeholder="Buscar..."
+                <div class="flex items-center gap-2 flex-wrap justify-end">
+                    <input x-model="leadSearch" @input.debounce.300ms="leadsPage = 1; loadLeads()" type="text" placeholder="Buscar..."
                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
-                    <select x-model="leadFilter" @change="loadLeads()"
+                    <select x-model="leadFilter" @change="leadsPage = 1; loadLeads()"
                             class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
                         <option value="">Todos</option>
                         <template x-for="(label, key) in statusLabels" :key="key">
                             <option :value="key" x-text="label"></option>
                         </template>
                     </select>
+                    <input x-model="leadsDateFrom" @change="leadsPage = 1; loadLeads()" type="date"
+                           class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                    <input x-model="leadsDateTo" @change="leadsPage = 1; loadLeads()" type="date"
+                           class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-blue-500">
                 </div>
             </div>
 
@@ -273,6 +277,27 @@
                 </table>
                 <div x-show="leads.length === 0" class="p-12 text-center text-gray-500">
                     No hay leads. Usa el scraper para agregar negocios.
+                </div>
+
+                <div x-show="leadsTotal > 0" class="flex items-center justify-between px-4 py-3 border-t border-gray-800 bg-gray-900/40">
+                    <span class="text-xs text-gray-400">
+                        Mostrando <span x-text="leads.length"></span> de <span x-text="leadsTotal"></span> leads
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button @click="leadsPage = Math.max(1, leadsPage - 1); loadLeads()"
+                                :disabled="leadsPage <= 1"
+                                class="px-2.5 py-1 rounded border text-xs transition bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                            Anterior
+                        </button>
+                        <span class="text-xs text-gray-400">
+                            Página <span x-text="leadsPage"></span> de <span x-text="Math.max(1, Math.ceil(leadsTotal / leadsPageSize))"></span>
+                        </span>
+                        <button @click="leadsPage = leadsPage + 1; loadLeads()"
+                                :disabled="leadsPage >= Math.ceil(leadsTotal / leadsPageSize)"
+                                class="px-2.5 py-1 rounded border text-xs transition bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                            Siguiente
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -513,6 +538,11 @@ document.addEventListener('alpine:init', function() {
             leads: [],
             leadFilter: '',
             leadSearch: '',
+            leadsDateFrom: '',
+            leadsDateTo: '',
+            leadsPage: 1,
+            leadsPageSize: 20,
+            leadsTotal: 0,
             showDetail: false,
             selectedLead: null,
             detailForm: {},
@@ -557,8 +587,13 @@ document.addEventListener('alpine:init', function() {
                     let url = `${API}/api/leads?`;
                     if (this.leadFilter) url += `status=${this.leadFilter}&`;
                     if (this.leadSearch) url += `search=${encodeURIComponent(this.leadSearch)}&`;
+                    if (this.leadsDateFrom) url += `date_from=${this.leadsDateFrom}&`;
+                    if (this.leadsDateTo) url += `date_to=${this.leadsDateTo}&`;
+                    url += `page=${this.leadsPage}&page_size=${this.leadsPageSize}&`;
                     const res = await _authFetch(url);
-                    this.leads = await res.json();
+                    const data = await res.json();
+                    this.leads = Array.isArray(data) ? data : (data.leads || []);
+                    this.leadsTotal = Array.isArray(data) ? data.length : (data.total ?? this.leads.length);
                 } catch (e) { console.error(e); }
             },
 
@@ -589,11 +624,13 @@ document.addEventListener('alpine:init', function() {
 
             async updateLeadStatus(id, status) {
                 try {
-                    await _authFetch(`${API}/api/leads/${id}`, {
+                    const res = await _authFetch(`${API}/api/leads/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ status }),
                     });
+                    const updatedLead = await res.json();
+                    this.leads = this.leads.map(lead => lead.id === id ? { ...lead, ...updatedLead } : lead);
                     await this.loadStats();
                 } catch (e) { console.error(e); }
             },

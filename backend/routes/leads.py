@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional
+from typing import List, Optional
 
 from backend.database import fetch_one, fetch_all, execute, execute_returning
 from backend.auth import get_current_user
@@ -13,24 +13,51 @@ router = APIRouter(prefix="/api/leads", tags=["leads"])
 async def list_leads(
     status: Optional[str] = None,
     search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
     user: dict = Depends(get_current_user),
 ):
-    query = "SELECT * FROM leads WHERE 1=1"
-    params = []
+    page = max(page, 1)
+    page_size = max(min(page_size, 100), 1)
+
+    where_clauses = ["1=1"]
+    params: list = []
     idx = 1
 
     if status:
-        query += f" AND status = ${idx}"
+        where_clauses.append(f"status = ${idx}")
         params.append(status)
         idx += 1
 
     if search:
-        query += f" AND (business_name ILIKE ${idx} OR category ILIKE ${idx} OR city ILIKE ${idx})"
+        where_clauses.append(f"(business_name ILIKE ${idx} OR category ILIKE ${idx} OR city ILIKE ${idx})")
         params.append(f"%{search}%")
         idx += 1
 
-    query += " ORDER BY created_at DESC"
-    return await fetch_all(query, *params)
+    if date_from:
+        where_clauses.append(f"created_at >= ${idx}")
+        params.append(date_from)
+        idx += 1
+
+    if date_to:
+        where_clauses.append(f"created_at <= ${idx}")
+        params.append(date_to)
+        idx += 1
+
+    where_sql = " AND ".join(where_clauses)
+
+    total_row = await fetch_one(f"SELECT COUNT(*) as total FROM leads WHERE {where_sql}", *params)
+    total = total_row["total"] if total_row else 0
+
+    offset = (page - 1) * page_size
+    rows = await fetch_all(
+        f"SELECT * FROM leads WHERE {where_sql} ORDER BY created_at DESC LIMIT {page_size} OFFSET {offset}",
+        *params,
+    )
+
+    return {"total": total, "page": page, "page_size": page_size, "leads": rows}
 
 
 @router.get("/stats/summary")
